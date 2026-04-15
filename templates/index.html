@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Root Finding Calculator | Advanced Numerical Methods</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Navigation Header -->
+        <nav class="navbar">
+            <div class="nav-content">
+                <div class="logo">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Root Finder</span>
+                </div>
+                <div class="nav-links">
+                    <a href="#" class="nav-link">Documentation</a>
+                    <a href="#" class="nav-link">Methods</a>
+                    <a href="#" class="nav-link">About</a>
+                </div>
+                <button class="theme-toggle" id="themeToggle" title="Toggle dark mode">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </nav>
+
+        <!-- Hero Section -->
+        <section class="hero-section">
+            <div class="hero-content">
+                <h1 class="hero-title">Root Finding Calculator</h1>
+                <p class="hero-subtitle">Solve any nonlinear equation using 6 advanced numerical methods</p>
+                <div class="methods-showcase">
+                    <div class="method-badge">
+                        <span class="badge-icon">📊</span>
+                        <span class="badge-text">Bisection</span>
+                    </div>
+                    <div class="method-badge">
+                        <span class="badge-icon">⚡</span>
+                        <span class="badge-text">Newton-Raphson</span>
+                    </div>
+                    <div class="method-badge">
+                        <span class="badge-icon">✨</span>
+                        <span class="badge-text">Muller's</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Content -->
+        <div class="main-wrapper">
+            <!-- Left Panel: Input Controls -->
+            <aside class="control-panel">
+                <div class="panel-header">
+                    <h2>
+                        <i class="fas fa-sliders-h"></i>
+                        Solver Configuration
+                    </h2>
+                </div>
+
+                {% if error_message %}
+                    <div class="alert alert-error">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <div>
+                            <strong>Error</strong>
+                            <p>{{ error_message }}</p>
+                        </div>
+                    </div>
+                {% endif %}
+
+                <form method="post" class="solver-form">
+                    <!-- Equation Input -->
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fas fa-function"></i> Equation
+                        </label>
+                        <input 
+                            type="text" 
+                            name="equation" 
+                            class="form-input" 
+                            value="{{ form_data.equation }}" 
+                            placeholder="e.g., x**3 - x - 2" 
+                            required
+                        >
+                        <small class="form-hint">Use Python syntax with 'x' as variable</small>
+                    </div>
+
+                    <!-- Example Equations -->
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fas fa-bookmark"></i> Quick Examples
+                        </label>
+                        <select id="example-select" class="form-select">
+                            <option value="">📝 Choose an example equation...</option>
+                            {% for example in examples %}
+                                <option value="{{ example }}">{{ example }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Method Selection -->
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fas fa-compass"></i> Solution Method
+                        </label>
+                        <select name="method" id="method-select" class="form-select">
+                            {% for method_name, method_info in method_info.items() %}
+                                <option 
+                                    value="{{ method_name }}" 
+                                    data-icon="{{ method_info.icon }}"
+                                    {% if form_data.method == method_name %}selected{% endif %}
+                                >
+                                    {{ method_info.icon }} {{ method_name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <small class="form-hint" id="method-description">
+                            Select a method to see details
+                        </small>
+                    </div>
+
+                    <!-- Dynamic Method Parameters -->
+                    <div class="parameters-container">
+                        {% for method_name, method_info in method_info.items() %}
+                            <div class="method-params" data-method="{{ method_name }}" style="display:none">
+                                <div class="method-info-card">
+                                    <strong>{{ method_info.icon }} {{ method_name }}</strong>
+                                    <p>{{ method_info.description }}</p>
+                                </div>
+                                {% for param_key, param_label in method_info.inputs %}
+                                    <div class="form-group">
+                                        <label class="form-label">{{ param_label }}</label>
+                                        <input 
+                                            type="number" 
+                                            step="any" 
+                                            name="{{ param_key }}" 
+                                            class="form-input"
+                                            value="{{ form_data.get(param_key, '') }}"
+                                        >
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Convergence Parameters -->
+                    <div class="divider"></div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-bullseye"></i> Tolerance
+                            </label>
+                            <input 
+                                type="text" 
+                                name="tol" 
+                                class="form-input" 
+                                value="{{ form_data.tol }}" 
+                                placeholder="1e-6"
+                                required
+                            >
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-repeat"></i> Max Iterations
+                            </label>
+                            <input 
+                                type="number" 
+                                name="max_iter" 
+                                class="form-input" 
+                                value="{{ form_data.max_iter }}" 
+                                required
+                            >
+                        </div>
+                    </div>
+
+                    <!-- Solve Button -->
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-play"></i> Solve Equation
+                    </button>
+                </form>
+
+                <!-- Info Box -->
+                <div class="info-box">
+                    <h4><i class="fas fa-lightbulb"></i> Tips</h4>
+                    <ul>
+                        <li>Set tolerance lower for higher precision</li>
+                        <li>Newton-Raphson is fastest but needs good initial guess</li>
+                        <li>Bisection always works if signs differ</li>
+                    </ul>
+                </div>
+            </aside>
+
+            <!-- Right Panel: Results -->
+            <main class="results-panel">
+                <div class="panel-header">
+                    <h2>
+                        <i class="fas fa-microscope"></i>
+                        Analysis Results
+                    </h2>
+                </div>
+
+                {% if result %}
+                    <!-- Status Banner -->
+                    <div class="result-status {% if result.converged %}status-success{% else %}status-warning{% endif %}">
+                        <div class="status-icon">
+                            {% if result.converged %}
+                                <i class="fas fa-check-circle"></i>
+                            {% else %}
+                                <i class="fas fa-exclamation-triangle"></i>
+                            {% endif %}
+                        </div>
+                        <div class="status-content">
+                            <h3>{{ 'Success' if result.converged else 'Partial' }}</h3>
+                            <p>{{ result.message }}</p>
+                        </div>
+                    </div>
+
+                    <!-- Key Metrics -->
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <div class="metric-icon">
+                                <i class="fas fa-root-icon" style="font-size: 24px;">√</i>
+                            </div>
+                            <div class="metric-content">
+                                <span class="metric-label">Root Found</span>
+                                <strong class="metric-value">
+                                    {% if result.root is not none %}
+                                        {{ '%.8f'|format(result.root) }}
+                                    {% else %}
+                                        Not found
+                                    {% endif %}
+                                </strong>
+                            </div>
+                        </div>
+
+                        <div class="metric-card">
+                            <div class="metric-icon">
+                                <i class="fas fa-counter" style="font-size: 24px;">⟳</i>
+                            </div>
+                            <div class="metric-content">
+                                <span class="metric-label">Iterations</span>
+                                <strong class="metric-value">{{ result.iterations }}</strong>
+                            </div>
+                        </div>
+
+                        <div class="metric-card">
+                            <div class="metric-icon">
+                                <i class="fas fa-minus-circle"></i>
+                            </div>
+                            <div class="metric-content">
+                                <span class="metric-label">Final Error</span>
+                                <strong class="metric-value">
+                                    {% if result.final_error is not none %}
+                                        {{ '%.2e'|format(result.final_error) }}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </strong>
+                            </div>
+                        </div>
+
+                        <div class="metric-card">
+                            <div class="metric-icon">
+                                <i class="fas fa-function"></i>
+                            </div>
+                            <div class="metric-content">
+                                <span class="metric-label">Method Used</span>
+                                <strong class="metric-value">{{ result.method }}</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Visualization -->
+                    <div class="plot-section">
+                        <h3><i class="fas fa-chart-area"></i> Function & Convergence Plot</h3>
+                        <div class="plot-container">
+                            <img 
+                                src="data:image/png;base64,{{ result.plot_image }}" 
+                                alt="Function and convergence plot"
+                                class="plot-image"
+                            >
+                        </div>
+                    </div>
+
+                    <!-- Iteration Table -->
+                    {% if result.history %}
+                        <div class="table-section">
+                            <h3><i class="fas fa-table"></i> Iteration History</h3>
+                            <div class="table-wrapper">
+                                <table class="iteration-table">
+                                    <thead>
+                                        <tr>
+                                            {% for key in result.history[0].keys() %}
+                                                <th>{{ key }}</th>
+                                            {% endfor %}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for row in result.history %}
+                                            <tr>
+                                                {% for value in row.values() %}
+                                                    <td>{{ value }}</td>
+                                                {% endfor %}
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="empty-state">
+                            <i class="fas fa-database"></i>
+                            <h3>No iteration history</h3>
+                            <p>The method completed without detailed iteration data.</p>
+                        </div>
+                    {% endif %}
+
+                    <!-- Export Button -->
+                    <button class="btn btn-secondary" onclick="exportResults()">
+                        <i class="fas fa-download"></i> Export Results
+                    </button>
+
+                {% elif error_message %}
+                    <div class="empty-state error">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <h3>Error Occurred</h3>
+                        <p>{{ error_message }}</p>
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-play-circle"></i>
+                        <h3>Ready to Solve</h3>
+                        <p>Configure your equation and click "Solve Equation" to see the results here.</p>
+                        <div class="empty-features">
+                            <div><i class="fas fa-chart-line"></i> Live visualization</div>
+                            <div><i class="fas fa-table"></i> Detailed iterations</div>
+                            <div><i class="fas fa-download"></i> Export data</div>
+                        </div>
+                    </div>
+                {% endif %}
+            </main>
+        </div>
+    </div>
+
+    <script>
+        // Theme toggle
+        const themeToggle = document.getElementById('themeToggle');
+        const htmlElement = document.documentElement;
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        
+        if (savedTheme === 'dark') {
+            htmlElement.setAttribute('data-theme', 'dark');
+            themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+        }
+        
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = htmlElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            htmlElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            themeToggle.innerHTML = newTheme === 'dark' ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+        });
+
+        // Method selection and description
+        const methodSelect = document.getElementById('method-select');
+        const methodDescription = document.getElementById('method-description');
+        const exampleSelect = document.getElementById('example-select');
+        const equationInput = document.querySelector('input[name="equation"]');
+
+        const methodDescriptions = {
+            {% for method_name, method_info in method_info.items() %}
+                "{{ method_name }}": {{ method_info.description|tojson }}{% if not loop.last %},{% endif %}
+            {% endfor %}
+        };
+
+        function updateMethodDisplay() {
+            const selectedMethod = methodSelect.value;
+            document.querySelectorAll('.method-params').forEach(el => {
+                el.style.display = 'none';
+            });
+            document.querySelector(`[data-method="${selectedMethod}"]`).style.display = 'block';
+            methodDescription.textContent = methodDescriptions[selectedMethod] || '';
+        }
+
+        methodSelect.addEventListener('change', updateMethodDisplay);
+        exampleSelect.addEventListener('change', (e) => {
+            if (e.target.value) {
+                equationInput.value = e.target.value;
+                exampleSelect.value = '';
+            }
+        });
+
+        function exportResults() {
+            const method = '{{ result.method if result else "" }}';
+            const equation = '{{ result.equation if result else "" }}';
+            const root = '{{ result.root if result else "" }}';
+            const iterations = '{{ result.iterations if result else "" }}';
+            
+            const csvContent = `Method,Equation,Root,Iterations\n${method},"${equation}",${root},${iterations}`;
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'root_finding_results.csv';
+            a.click();
+        }
+
+        // Initialize on load
+        updateMethodDisplay();
+    </script>
+</body>
+</html>
