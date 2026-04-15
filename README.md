@@ -2,6 +2,17 @@
 
 A Flask-based web application for solving nonlinear equations with classical numerical methods. The project combines a browser UI, Python solver modules, equation parsing, and matplotlib-based visualizations in a single lightweight app.
 
+SEO & Sharing Tips
+
+- Live demo: https://root-finding-calculator.vercel.app/
+- Recommended social share text:
+
+  "Try Root Finding Calculator — enter an equation and explore Bisection, Newton‑Raphson, Secant, False Position, Muller's and Fixed‑Point methods with iteration history and convergence plots. Live demo: https://root-finding-calculator.vercel.app/"
+
+- Add a screenshot (`static/og-image.png`) for better link previews on social platforms.
+
+If you want, I can generate a ready-to-use social preview image and update the README badges.
+
 ## Project Analysis
 
 This repository is organized as a small full-stack Python app:

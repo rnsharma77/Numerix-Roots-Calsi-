@@ -1,0 +1,16 @@
+{
+  "name": "Root Finding Calculator",
+  "short_name": "RootFinder",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0D1117",
+  "theme_color": "#0D1117",
+  "description": "Solve nonlinear equations using classical numerical methods and visualize convergence.",
+  "icons": [
+    {
+      "src": "/static/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

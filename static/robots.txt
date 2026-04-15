@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Sitemap: https://root-finding-calculator.vercel.app/static/sitemap.xml
+
+# Disallow any private or admin paths (none in this project)
+# Disallow: /admin

@@ -3,7 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Root Finding Calculator | Advanced Numerical Methods</title>
+        <title>Root Finding Calculator | Numerical Methods & Visualizations</title>
+        <meta name="description" content="Root Finding Calculator — a lightweight Flask app to solve nonlinear equations using Bisection, Newton‑Raphson, Secant, False Position, Muller's and Fixed‑Point methods. View iteration history, convergence plots, and export results. Live demo: https://root-finding-calculator.vercel.app/">
+        <meta name="keywords" content="root finding, numerical methods, bisection, newton raphson, secant, muller's method, false position, fixed point, python, flask, matplotlib, sympy">
+        <link rel="canonical" href="https://root-finding-calculator.vercel.app/">
+        <meta name="robots" content="index, follow">
+
+        <!-- Open Graph / Social -->
+        <meta property="og:title" content="Root Finding Calculator — Numerical Methods Demo">
+        <meta property="og:description" content="Solve nonlinear equations with Bisection, Newton‑Raphson, Secant, False Position, Muller's and Fixed‑Point methods. See iteration history and convergence plots.">
+        <meta property="og:type" content="website">
+        <meta property="og:url" content="https://root-finding-calculator.vercel.app/">
+        <meta property="og:image" content="https://root-finding-calculator.vercel.app/static/og-image.png">
+
+        <!-- Twitter Card -->
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:title" content="Root Finding Calculator — Numerical Methods Demo">
+        <meta name="twitter:description" content="Solve nonlinear equations and visualize convergence with iteration history and plots.">
+        <meta name="twitter:image" content="https://root-finding-calculator.vercel.app/static/og-image.png">
+
+        <!-- Structured data (JSON-LD) -->
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "WebApplication",
+            "name": "Root Finding Calculator",
+            "url": "https://root-finding-calculator.vercel.app/",
+            "description": "A Flask web app demonstrating classical numerical root-finding methods with plots and iteration history.",
+            "applicationCategory": "Education",
+            "operatingSystem": "Web",
+            "image": "https://root-finding-calculator.vercel.app/static/og-image.png",
+            "author": {
+                "@type": "Person",
+                "name": "Project Author"
+            },
+            "publisher": {
+                "@type": "Organization",
+                "name": "Root Finding Calculator",
+                "logo": {
+                    "@type": "ImageObject",
+                    "url": "https://root-finding-calculator.vercel.app/static/og-image.png"
+                }
+            }
+        }
+        </script>
+    
+        <!-- Additional metadata and icons -->
+        <meta name="author" content="Project Author">
+        <meta name="publisher" content="Root Finding Calculator">
+        <meta name="rating" content="General">
+        <meta name="theme-color" content="#0D1117">
+        <link rel="manifest" href="/static/manifest.json">
+        <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+        <link rel="apple-touch-icon" href="/static/favicon.svg">
+        <meta property="og:site_name" content="Root Finding Calculator">
+        <meta property="og:locale" content="en_US">
+        <meta property="og:locale:alternate" content="en_GB">
+        <meta property="og:updated_time" content="2026-04-15T00:00:00+00:00">
+        <meta name="twitter:site" content="@your_twitter_handle">
+        <meta name="twitter:creator" content="@your_twitter_handle">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>

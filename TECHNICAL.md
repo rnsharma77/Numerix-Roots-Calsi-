@@ -1,414 +1,262 @@
-# 🔧 Technical Documentation
+# Technical Documentation
 
-## Architecture Overview
+## Overview
 
+This project is a server-rendered Flask application for root finding. A browser form collects the equation, numerical method, and method parameters. The backend parses the equation, runs the selected algorithm, generates a matplotlib figure, serializes iteration history, and returns the results to the template for display.
+
+## Architecture
+
+```text
+Browser
+  |
+  v
+templates/index.html + static/style.css
+  |
+  v
+main.py (Flask route, validation, orchestration)
+  |
+  +--> utils/parser.py   -> parse equation and derivative
+  +--> methods/*.py      -> run selected root-finding method
+  +--> utils/graph.py    -> generate function/convergence plot
+  |
+  v
+Rendered HTML with metrics, plot image, and iteration table
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                          main.py (GUI)                          │
-│  - RootFinderApp(tk.Tk): Main window and layout                 │
-│  - IterationTableDialog: Results table view                      │
-│  - StyledEntry, StyledButton: Custom widgets                    │
-└──────────────────┬──────────────────────┬──────────────────────┘
-                   │                      │
-        ┌──────────▼────────────┐  ┌─────▼──────────────────┐
-        │  methods/ package     │  │  utils/ package        │
-        ├───────────────────────┤  ├────────────────────────┤
-        │ • bisection.py        │  │ • parser.py            │
-        │ • newton.py           │  │ • graph.py             │
-        │ • secant.py           │  │ • results.py (NEW)     │
-        │ • false_position.py   │  │                        │
-        │ • mullers.py          │  │ Parsing: str → callable
-        │ • fixed_point.py      │  │ Graphs: f, errors → Fig
-        └───────────────────────┘  │ Export: results → CSV  │
-                                    └────────────────────────┘
-```
 
----
+## Request Flow
 
-## Module Descriptions
+1. The user submits the form on `/`.
+2. `main.py:index()` copies request values into `form_data`.
+3. `_solve_request()` parses the equation and validates tolerance and iteration count.
+4. The selected method implementation is called from `methods/`.
+5. The solver result is normalized into a response dictionary.
+6. `utils/graph.build_figure()` creates a two-panel matplotlib figure.
+7. The figure is converted to base64 and embedded directly into the HTML response.
+8. The template displays status, metrics, iteration history, and the generated plot.
 
-### `main.py` (527 lines)
-**Purpose**: GUI application entry point using Tkinter
+## Core Modules
 
-**Key Classes**:
-- `RootFinderApp(tk.Tk)` — Main application window
-  - `_build_ui()` — Construct UI layout
-  - `_build_left_panel()` — Left sidebar (controls)
-  - `_build_inputs()` — Dynamic method-specific inputs
-  - `_solve()` — Execute selected method
-  - `_display_results()` — Show solution in UI
-  - `_plot()` — Render graph
-  - `_export_results()` — Save to CSV
+### `main.py`
 
-- `IterationTableDialog(tk.Toplevel)` — Shows iteration details
+Responsibilities:
 
-- `StyledEntry`, `StyledButton`, `SectionLabel` — Custom widgets
+- Creates the Flask app
+- Defines available methods and their required inputs
+- Accepts `GET` and `POST` requests on `/`
+- Parses and validates submitted values
+- Dispatches the selected numerical method
+- Serializes floating-point history rows for table display
+- Generates plot output as a base64 PNG string
 
-- `Tooltip` — Hover help text
+Important data structures:
 
-**Flow**:
-1. User enters equation + parameters
-2. Click SOLVE → `_solve()` method
-3. Parse equation → `parse_equation()`
-4. Call method (bisection, newton, etc.)
-5. Display results → `_display_results()`
-6. Render graph → `_plot()` via matplotlib
+- `METHOD_INFO`
+  - UI-facing metadata for labels, descriptions, icons, and required parameters
+- `DEFAULT_FORM`
+  - Default values shown when the page first loads
+- `METHOD_DEFAULTS`
+  - Fallback values used when the selected method needs missing inputs
 
----
+Important helper functions:
 
-### `methods/` Package
+- `_serialize_history(history)`
+  - Formats float values to 8 decimal places before rendering
+- `_figure_to_base64(fig)`
+  - Saves a matplotlib figure to an in-memory PNG
+- `_build_plot_data(f, result, method)`
+  - Calls `build_figure()` and returns an embeddable image string
+- `_solve_request(form_data)`
+  - Main orchestration function for solving a submitted equation
 
-#### `bisection.py`
-```python
-def bisection(f, a, b, tol=1e-6, max_iter=100) -> dict
-```
-- **Inputs**: Continuous function f on [a,b] with f(a)·f(b) < 0
-- **Algorithm**: Recursive interval halving
-- **Returns**: `{root, iterations, errors, history, converged, message}`
-- **Time**: O(log(1/tol)) evaluations
-- **Guaranteed**: Always converges if sign change exists
+### `methods/`
 
-#### `false_position.py` (NEW)
-```python
-def false_position(f, a, b, tol=1e-6, max_iter=100) -> dict
-```
-- **Improvement**: Uses linear interpolation instead of midpoint
-- **Formula**: c = (a·f(b) - b·f(a)) / (f(b) - f(a))
-- **Faster**: Converges faster than bisection typically
-- **Guaranteed**: Like bisection, always works with sign change
+Each method module returns a dictionary with a shared shape:
 
-#### `newton.py`
-```python
-def newton_raphson(f, df, x0, tol=1e-6, max_iter=100) -> dict
-```
-- **Requires**: f(x) and f'(x)
-- **Formula**: x_{n+1} = x_n - f(x_n)/f'(x_n)
-- **Speed**: Quadratic convergence (very fast!)
-- **Risks**: Can diverge with bad x0 or if f'(x) ≈ 0
-
-#### `secant.py`
-```python
-def secant(f, x0, x1, tol=1e-6, max_iter=100) -> dict
-```
-- **No derivative needed** — Approximates f'(x) numerically
-- **Formula**: x_{n+1} = x_n - f(x_n)·(x_n - x_{n-1})/(f(x_n) - f(x_{n-1}))
-- **Speed**: Superlinear (order ≈ 1.618)
-- **Uses**: Two initial guesses, not one
-
-#### `mullers.py` (NEW)
-```python
-def mullers_method(f, x0, x1, x2, tol=1e-6, max_iter=100) -> dict
-```
-- **Inputs**: Three initial guesses
-- **Algorithm**: Fits parabola through 3 points
-- **Speed**: Very fast (order ≈ 1.84)
-- **Unique**: Can find complex roots (returns real when available)
-
-#### `fixed_point.py` (NEW)
-```python
-def fixed_point(g, x0, tol=1e-6, max_iter=100) -> dict
-```
-- **Setup**: User provides rearrangement g such that x = g(x)
-- **Formula**: x_{n+1} = g(x_n)
-- **Convergence**: Depends on |g'(x*)| where x* is fixed point
-- **Flexible**: User controls iteration function
-
-**Result Dictionary Structure**:
 ```python
 {
-    "root": float,           # The found root
-    "iterations": int,       # Iterations performed
-    "errors": [float, ...],  # Error per iteration
-    "history": [dict, ...],  # Detailed iteration data
-    "converged": bool,       # Convergence status
-    "message": str          # Status message
+    "root": float | None,
+    "iterations": int,
+    "errors": list[float],
+    "history": list[dict],
+    "converged": bool,
+    "message": str
 }
 ```
 
----
+Implemented methods:
+
+- `bisection.py`
+  - Requires `a` and `b`
+  - Uses interval halving
+  - Returns failure when `f(a)` and `f(b)` do not have opposite signs
+- `false_position.py`
+  - Requires `a` and `b`
+  - Uses linear interpolation inside the bracketed interval
+- `newton.py`
+  - Requires derivative `df` and initial guess `x0`
+  - Stops if the derivative is too close to zero
+- `secant.py`
+  - Requires `x0` and `x1`
+  - Approximates derivative from two recent points
+- `mullers.py`
+  - Requires `x0`, `x1`, and `x2`
+  - Uses a quadratic fit through three points
+  - Stops early if a complex discriminant appears
+- `fixed_point.py`
+  - Requires iteration function `g(x)` and initial guess `x0`
+  - Tracks `x_{n+1} - x_n` as the error measure
 
 ### `utils/parser.py`
-**Purpose**: Convert equation string to callable function + derivative
 
-**Function**:
-```python
-def parse_equation(expr_str: str) -> (callable, callable, str, str|None)
-```
+Responsibilities:
 
-**Returns**:
-- `f(x)` — Function evaluator
-- `df(x)` — Derivative (symbolic via SymPy, else numerical)
-- `expr_str` — Cleaned equation string
-- `error` — Error message if parsing failed
+- Cleans the equation string
+- Replaces `^` with `**`
+- Validates the expression with a restricted evaluation namespace
+- Builds a callable function `f(x)`
+- Builds a derivative function `df(x)`
 
-**Supported**:
-- All Python math operators: `+`, `-`, `*`, `/`, `**`, `()`, etc.
-- 30+ functions: trig, hyperbolic, exponential, logarithmic, power, utilities
-- Constants: `pi`, `e`, `tau`, `inf`
+Derivative strategy:
 
-**Security**:
-- Uses restricted namespace (`__builtins__` removed)
-- Prevents arbitrary code execution
+- Uses SymPy symbolic differentiation when available
+- Falls back to central-difference numerical differentiation with `h = 1e-7`
 
-**Derivatives**:
-1. **SymPy**: Symbolic differentiation if available
-2. **Fallback**: Central difference numerical derivative (h=1e-7)
+Supported expression space includes:
 
----
+- arithmetic operators
+- trigonometric functions
+- hyperbolic functions
+- exponentials and logarithms
+- roots, powers, and absolute-value helpers
+- constants such as `pi`, `e`, `tau`, and `inf`
+
+Security note:
+
+- The parser removes `__builtins__` and uses a curated namespace, which is safer than unrestricted `eval`.
+- This is still not equivalent to a hardened sandbox and should be treated as controlled project input handling, not full isolation.
 
 ### `utils/graph.py`
-**Purpose**: Generate matplotlib Figure with function plot + convergence graph
 
-**Function**:
-```python
-def build_figure(f, root, errors, method_name, a=None, b=None) -> Figure
+Responsibilities:
+
+- Configures matplotlib for server-side rendering with the `Agg` backend
+- Generates a two-row figure:
+  - function plot with root marker
+  - convergence plot on a logarithmic y-scale
+- Chooses a plotting window centered around the root or interval
+- Filters invalid or extremely large values to avoid noisy plots
+
+Implementation notes:
+
+- Bisection shades the initial interval on the function plot
+- The plotting theme uses a dark palette regardless of page theme
+- Figures are returned as `matplotlib.figure.Figure` objects
+
+### `utils/results.py`
+
+Responsibilities:
+
+- Save result data to CSV
+- Load a subset of saved result data from CSV
+
+Current integration status:
+
+- Present in the repository
+- Not currently used by the Flask route or the browser export button
+- The browser export in `templates/index.html` creates a lightweight CSV on the client side instead
+
+## Frontend Layer
+
+### `templates/index.html`
+
+Main UI sections:
+
+- sticky navigation and theme toggle
+- hero section with method badges
+- control panel with equation, method selection, and parameter inputs
+- results panel with status, summary metrics, plot, and iteration history
+
+Client-side behaviors:
+
+- switches visible parameter inputs based on selected method
+- fills the equation field from example selections
+- stores theme preference in `localStorage`
+- exports a summary CSV in the browser
+
+Important implementation detail:
+
+- Method-specific fields are rendered from `METHOD_INFO`
+- The template expects `result.history` to already be formatted for display
+
+### `static/style.css`
+
+The stylesheet provides:
+
+- responsive two-column layout on desktop
+- single-column layout on smaller screens
+- light and dark theme variables
+- card, table, button, and status-state styling
+
+## Method Input Mapping
+
+```text
+Bisection       -> equation, a, b, tol, max_iter
+False Position  -> equation, a, b, tol, max_iter
+Newton-Raphson  -> equation, x0, tol, max_iter
+Secant          -> equation, x0, x1, tol, max_iter
+Muller's        -> equation, x0, x1, x2, tol, max_iter
+Fixed Point     -> equation, x0, g(x), tol, max_iter
 ```
 
-**Output**: 2-subplot figure
-- **Top**: Function curve + root marker + interval (for bisection)
-- **Bottom**: Convergence analysis (error vs iteration, log scale)
+## Mathematical Formulas
 
-**Features**:
-- Dark theme (GitHub-inspired)
-- Automatic range detection
-- Handles singularities (NaN removal)
-- Color-coded elements
-- Grid, labels, legend
+This section lists the core update formulas used by each implemented root-finding method:
 
----
+- **Bisection method**: given a bracket [a_n, b_n] with f(a_n)f(b_n) < 0, the next iterate is
 
-### `utils/results.py` (NEW)
-**Purpose**: Save/load analysis results
+  $x_{n+1} = (a_n + b_n) / 2$
 
-**Functions**:
-```python
-def save_results_to_csv(file_path, equation, method, result, tolerance, max_iterations) -> bool
+  Update the bracket by replacing the endpoint with the same sign as f(x_{n+1}). Error bound after n iterations: |b_n - a_n| / 2.
 
-def load_results_from_csv(file_path) -> dict|None
-```
+- **False Position (Regula Falsi)**: linear interpolation inside [a_n, b_n]:
 
-**CSV Format**:
-```csv
-Root Finding Calculator - Results,
-Generated,2024-11-28 10:30:45
+  $x_{n+1} = b_n - f(b_n) * (b_n - a_n) / (f(b_n) - f(a_n))$
 
-Configuration:
-Equation,x**3 - x - 2
-Method,Newton-Raphson
-Tolerance,1e-06
-Max Iterations,100
+- **Newton–Raphson**: uses the derivative f':
 
-Results Summary:
-Root Found,1.521379706800...
-Iterations Performed,5
-Converged,Yes
-Final Error,5.32e-13
-Message,Converged in 5 iterations. Root ≈ 1.52137970680000
+  $x_{n+1} = x_n - f(x_n) / f'(x_n)$
 
-Iteration History:
-iter,root,f_root,error,x_prev
-1,1.365...,0.1234...,0.135...,1.5
-2,1.521...,0.0012...,0.156...,1.365...
-...
-```
+- **Secant method**: approximates the derivative from two recent points:
 
----
+  $x_{n+1} = x_n - f(x_n) * (x_n - x_{n-1}) / (f(x_n) - f(x_{n-1}))$
 
-## Data Flow
+- **Muller's method**: fit a quadratic p(x)=ax^2+bx+c through three points and take the root of the quadratic nearest x_n:
 
-### Solving an Equation (Example: Newton-Raphson)
+  $x_{n+1} = x_n + (-2c) / (b \pm sqrt(b^2 - 4ac))$
 
-```
-1. User clicks SOLVE
-   ↓
-2. main.py._solve() executes
-   ├─ Parse equation string → f(x), f'(x)
-   ├─ Read tolerance & max_iter
-   ├─ Read method parameters (x0)
-   ├─ Call newton.newton_raphson(f, df, x0, tol, max_iter)
-   └─ Result dict returned
-   ↓
-3. _display_results() shows:
-   ├─ Root value (in green if convergence)
-   ├─ Iteration count
-   ├─ Final error
-   └─ Status message
-   ↓
-4. _plot() generates graph:
-   ├─ plot_function + root marker
-   ├─ convergence_error log plot
-   └─ Render in Tkinter canvas
-   ↓
-5. User can:
-   ├─ View "iteration Table" → IterationTableDialog
-   ├─ Click "Export" → save CSV
-   └─ Solve new equation
-```
+  (Choose the sign in the denominator to avoid cancellation — typical implementations select the sign of b that gives a larger-magnitude denominator.)
 
----
+- **Fixed-point iteration**: iterate $x_{n+1} = g(x_n)$. Convergence at root r requires |g'(r)| < 1.
 
-## Adding a New Method
+Notes on convergence orders: bisection is linear, Newton's method is typically quadratic, the secant method has order about phi ≈ 1.618, and false position often behaves like a linear method but may show superlinear behavior depending on the function.
 
-### Step 1: Create method file
-```python
-# methods/new_method.py
+## Known Technical Gaps
 
-def new_method(f, param1, param2, tol=1e-6, max_iter=100):
-    """
-    Find root using [Method Name].
-    
-    Returns:
-        dict with keys: root, iterations, errors, history, converged, message
-    """
-    errors = []
-    history = []
-    
-    for i in range(1, max_iter + 1):
-        # Your algorithm here
-        x_new = compute_next_x(...)
-        error = abs(x_new - x_prev)
-        
-        errors.append(error)
-        history.append({
-            "iter": i,
-            "root": x_new,
-            "f_root": f(x_new),
-            "error": error,
-            # ... other details
-        })
-        
-        if error < tol:
-            return {
-                "root": x_new,
-                "iterations": i,
-                "errors": errors,
-                "history": history,
-                "converged": True,
-                "message": f"Converged in {i} iterations."
-            }
-    
-    return {
-        "root": x_new,
-        "iterations": max_iter,
-        "errors": errors,
-        "history": history,
-        "converged": False,
-        "message": f"Max iterations reached."
-    }
-```
+- `main.py` runs with Flask debug mode enabled.
+- The frontend renders the `g` input for Fixed Point as `type="number"`, even though the backend expects an expression string. This is a UI/backend mismatch worth fixing.
+- `utils/results.py` is partially disconnected from the current web workflow.
+- There is no automated test coverage for route handling, parser validation, or solver correctness.
+- Several source files still contain encoding artifacts in strings copied from older edits.
 
-### Step 2: Import in main.py
-```python
-from methods.new_method import new_method
-```
+## Suggested Engineering Next Steps
 
-### Step 3: Add to METHOD_INFO
-```python
-METHOD_INFO = {
-    ...
-    "New Method": {"inputs": ["param1", "param2"], "keys": ["p1", "p2"]},
-}
-```
+1. Add unit tests for each numerical method and for `parse_equation()`.
+2. Add Flask route tests for valid submissions and common validation failures.
+3. Fix the Fixed Point `g(x)` input type in the template.
+4. Replace the client-side export helper with server-generated CSV using `utils/results.py`.
+5. Normalize file encodings to UTF-8 and clean up display text artifacts.
 
-### Step 4: Add to _solve() switch
-```python
-elif method == "New Method":
-    result = new_method(f, inputs["p1"], inputs["p2"], tol, max_iter)
-    result["_a"], result["_b"] = None, None
-```
-
-Done! New method now available in dropdown.
-
----
-
-## Supported Output Formats
-
-### Current: CSV via `_export_results()`
-
-### Future: Could add
-- **JSON** for structured data
-- **PDF** with formatted report
-- **Excel** with formulas
-- **LaTeX** for academic papers
-- **HTML** with interactive plots
-
----
-
-## Performance Characteristics
-
-| Method | Time per iteration | Total for 1e-6 accuracy |
-|---|---|---|
-| Bisection | O(1) | ~20 iterations |
-| False Position | O(1) | ~8-15 iterations |
-| Newton-Raphson | O(1) + f'(x) | 3-10 iterations |
-| Secant | O(1) | 8-15 iterations |
-| Muller's | O(1) | 4-8 iterations |
-| Fixed Point | O(1) + g(x) | 10-100+ iterations |
-
-**Notes**:
-- Actual iterations depend on:
-  - Equation difficulty (smoothness, root multiplicity)
-  - Method implementation details
-  - Initial guess quality
-  - Convergence tol tolerance
-
----
-
-## Testing Equations
-
-### Simple Tests
-```python
-# Linear: x = 1 (obvious, all methods converge instantly)
-"x - 1"
-
-# Quadratic: x = ±2
-"x**2 - 4"
-
-# Cubic: x ≈ 1.52
-"x**3 - x - 2"
-```
-
-### Medium Tests
-```python
-"cos(x) - x"           # Transcendental mix
-"exp(x) - 3*x"         # Exponential growth vs. linear
-"sin(x)/x - 0.5"       # Oscillation + division
-```
-
-### Hard Tests
-```python
-"x**10 - 1"            # High power (multiple roots)
-"tan(x) - x"           # Singularities (asymptotes)
-"exp(-x**2) - 0.5"     # Flat near center
-```
-
----
-
-## Debugging Tips
-
-### If method doesn't converge:
-1. Check equation syntax in terminal:
-   ```python
-   from utils.parser import parse_equation
-   f, df, eq, err = parse_equation("your_equation")
-   print(f(1.0), df(1.0))  # Should return numbers
-   ```
-
-2. Visualize equation (external):
-   ```python
-   import numpy as np
-   import matplotlib.pyplot as plt
-   x = np.linspace(-5, 5, 1000)
-   y = [f(xi) for xi in x]
-   plt.plot(x, y)
-   plt.grid()
-   plt.show()
-   ```
-
-3. Test specific method manually:
-   ```python
-   from methods.newton import newton_raphson
-   result = newton_raphson(f, df, 1.5, 1e-6, 100)
+e-6, 100)
    print(result)
    ```
 
